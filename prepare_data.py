@@ -1,5 +1,10 @@
 import pandas as pd
 import os
+import ssl
+
+# UCI archive dang dung SSL certificate het han -> bo qua verify de tai duoc dataset cong khai.
+# Chi dung cho nguon du lieu tin cay trong moi truong lab, khong dung cho production.
+ssl._create_default_https_context = ssl._create_unverified_context
 
 TRAIN_URL = "https://archive.ics.uci.edu/ml/machine-learning-databases/adult/adult.data"
 TEST_URL  = "https://archive.ics.uci.edu/ml/machine-learning-databases/adult/adult.test"
