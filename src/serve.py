@@ -1,4 +1,5 @@
-# Income model inference API (FastAPI + boto3 tai model tu S3)
+# Income model inference API (FastAPI + boto3 tai model tu S3).
+# CI chay tren Python 3.12 (scipy/matplotlib yeu cau >=3.11).
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 import boto3
