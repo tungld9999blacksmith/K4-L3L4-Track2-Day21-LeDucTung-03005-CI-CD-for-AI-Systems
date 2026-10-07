@@ -16,7 +16,7 @@ HƯỚNG DẪN - đọc rồi XÓA TOÀN BỘ các khối chú thích này sau k
 | Họ và tên | Lê Đức Tùng |
 | MSSV | 2A202603005 |
 | Lớp / Khóa | K4 |
-| Repo GitHub | https://github.com/___/___ |
+| Repo GitHub | https://github.com/tungld9999blacksmith/K4-L3L4-Track2-Day21-LeDucTung-03005-CI-CD-for-AI-Systems |
 | Ngày nộp | 7/10/2026 |
 
 ---
@@ -83,9 +83,9 @@ Cần nêu được:
 
 | Khó khăn | Nguyên nhân | Cách giải quyết |
 |---|---|---|
-| ___ | ___ | ___ |
-| ___ | ___ | ___ |
-| ___ | ___ | ___ |
+| Job Train thất bại với lỗi 403 Forbidden khi chạy `dvc pull` | Policy IAM của `income-lab-user` bị tạo với tên bucket rỗng nên không cấp quyền trên bucket thật | Cập nhật lại policy để trỏ đúng `arn:aws:s3:::income-lab-tung-2026` rồi chạy lại pipeline |
+| Bước cài dependencies trong CI thất bại | `scipy` và `matplotlib` trong `requirements.txt` yêu cầu Python ≥ 3.11 nhưng workflow đặt Python 3.10 | Nâng `python-version` lên 3.12 trong `cicd.yml` cho cả hai job |
+| GitHub Actions không tự chạy sau khi push | Repo là bản fork nên Actions bị tắt mặc định | Bật Actions thủ công trong tab Actions, sau đó push một thay đổi trong `src/` để kích hoạt |
 
 ---
 
