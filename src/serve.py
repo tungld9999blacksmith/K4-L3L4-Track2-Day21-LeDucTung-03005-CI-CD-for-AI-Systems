@@ -1,3 +1,4 @@
+# Income model inference API (FastAPI + boto3 tai model tu S3)
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 import boto3
