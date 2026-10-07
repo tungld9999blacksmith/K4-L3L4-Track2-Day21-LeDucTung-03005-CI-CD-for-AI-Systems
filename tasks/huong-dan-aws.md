@@ -36,34 +36,41 @@ aws configure
 
 Nếu chưa có AWS CLI: tải tại https://aws.amazon.com/cli/ (Windows có file `.msi`).
 
+### 0.1.1 (Windows) Chọn shell và chiến lược hai IAM user
+
+- **Shell:** Toàn bộ hướng dẫn gốc dùng cú pháp **bash**. Trên Windows có hai lựa chọn:
+  - **Git Bash**: chạy được y nguyên các lệnh bash (`export`, `cat <<EOF`, `chmod`...).
+  - **PowerShell**: phải đổi cú pháp (`$VAR=` thay cho `export`, here-string `@"..."@` thay cho `<<EOF`). Các mục dưới có sẵn bản PowerShell.
+- **Hai IAM user, hai vai trò khác nhau** (đừng nhầm lẫn — đây là lỗi hay gặp nhất):
+  - `ai-lab-user` = **người thao tác** (tạo bucket, tạo EC2). Cần quyền rộng: gắn `AmazonS3FullAccess` + `AmazonEC2FullAccess` (hoặc `AdministratorAccess`). **Giữ user này làm profile `default`** của `aws configure`.
+  - `income-lab-user` = **danh tính CI/CD** (least-privilege, chỉ S3 trên đúng 1 bucket). **Không** nạp vào CLI local; chỉ dùng cho **GitHub Secrets** và (tùy chọn) cho DVC.
+  - ⚠️ Nếu lỡ `aws configure` đè `default` bằng key của `income-lab-user`, bạn sẽ bị `AccessDenied` khi tạo bucket/EC2. Khi đó chạy `aws configure` lại, nhập key của `ai-lab-user`, và xác nhận bằng `aws sts get-caller-identity` (phải thấy `.../user/ai-lab-user`).
+
 ### 0.2 Sửa `requirements.txt`
 
-Đổi hai dòng liên quan provider:
+`requirements.txt` sinh từ `pip freeze` trên Windows có vài vấn đề làm **fail CI trên ubuntu-latest**, cần sửa:
 
-```diff
-- dvc[gs]==3.50.1
-+ dvc[s3]==3.50.1
-...
-- google-cloud-storage==2.16.0
-+ boto3==1.34.100
+| Vấn đề | Cách sửa |
+|---|---|
+| File lưu dạng **UTF-16** | Lưu lại thành **UTF-8/ASCII** (pip đọc ổn định hơn) |
+| `pywin32==312` (chỉ chạy Windows) | **Xóa dòng này** — Linux không cài được, `pip install` sẽ fail |
+| `google-cloud-storage==...` (SDK của GCP) | Xóa (không dùng với AWS) |
+| Thiếu `boto3` | **Thêm `boto3`** — `serve.py` và bước upload model trong CI đều `import boto3` |
+| DVC chưa có extra S3 | Đảm bảo có `dvc-s3` (và `s3fs`); nếu dùng `dvc==3.50.1` thì `pip install dvc-s3` |
+
+Lưu ý version: `boto3` và `botocore` phải **cùng số version**. Nếu `botocore==1.43.106` thì dùng `boto3==1.43.106`. Kiểm tra không xung đột bằng:
+
+```bash
+pip install --dry-run boto3==1.43.106 botocore==1.43.106 s3fs dvc-s3
 ```
 
-File `requirements.txt` sau khi sửa (phần liên quan):
-
-```
-dvc[s3]==3.50.1
-fastapi==0.111.0
-boto3==1.34.100
-joblib==1.4.2
-mlflow==2.13.0
-...
-```
-
-Sau đó cài lại:
+Sau khi sửa, cài lại:
 
 ```bash
 pip install -r requirements.txt
 ```
+
+> Gợi ý (tùy chọn): tách `requirements.local.txt` (đầy đủ gói để chạy local) khỏi `requirements.txt` (gọn, chỉ gói cần cho CI) để pipeline cài nhanh và tránh gói Windows-only.
 
 ### 0.3 Sửa `src/serve.py` dùng boto3 thay cho google.cloud.storage
 
@@ -102,18 +109,27 @@ Những phần còn lại của `serve.py` (`download_model()` được gọi, `
 
 Tên bucket phải là duy nhất toàn cầu. Thay `<BUCKET_NAME>` bằng tên của bạn (ví dụ `income-lab-tung-2026`).
 
+**Git Bash:**
 ```bash
 export BUCKET=<BUCKET_NAME>
 export REGION=us-east-1
-
 aws s3 mb s3://$BUCKET --region $REGION
 ```
 
-Xác nhận bucket đã tạo:
+**PowerShell:**
+```powershell
+$BUCKET = "<BUCKET_NAME>"
+$REGION = "us-east-1"
+aws s3 mb "s3://$BUCKET" --region $REGION
+```
+
+Xác nhận bucket đã tạo (dùng `head-bucket` thay cho `aws s3 ls`, vì `ai-lab-user` có thể không có quyền `ListAllMyBuckets`):
 
 ```bash
-aws s3 ls | grep $BUCKET
+aws s3api head-bucket --bucket <BUCKET_NAME>    # không lỗi = tồn tại & truy cập được
 ```
+
+> Nếu `aws s3 mb` báo `AccessDenied ... s3:CreateBucket`: `ai-lab-user` chưa đủ quyền. Vào AWS Console (root/admin) gắn `AmazonS3FullAccess` (+ `AmazonEC2FullAccess`) cho user này rồi chạy lại.
 
 ---
 
@@ -242,14 +258,48 @@ aws ec2 describe-instances \
 
 Ghi lại IP công khai vừa in ra.
 
+### 2.4 (Windows / PowerShell)
+
+Khác biệt quan trọng trên Windows: **không** dùng `>` hay `Out-File` để lưu private key — chúng tạo file UTF-16/CRLF làm hỏng key. Dùng `WriteAllText` (UTF-8 không BOM, LF) như dưới.
+
+```powershell
+# 1. Key pair -> lưu income-key.pem đúng định dạng
+$keyLines = aws ec2 create-key-pair --key-name income-key --query 'KeyMaterial' --output text
+$key = ($keyLines -join "`n") + "`n"
+[System.IO.File]::WriteAllText("$PWD\income-key.pem", $key, [System.Text.UTF8Encoding]::new($false))
+
+# Sửa quyền để Windows OpenSSH chấp nhận (tương đương chmod 400)
+icacls income-key.pem /inheritance:r
+icacls income-key.pem /grant:r "$($env:USERNAME):R"
+
+# 2. Security group + mở cổng 22 và 8080
+aws ec2 create-security-group --group-name income-api-sg --description "Income API lab"
+$SG = (aws ec2 describe-security-groups --group-names income-api-sg --query 'SecurityGroups[0].GroupId' --output text).Trim()
+aws ec2 authorize-security-group-ingress --group-id $SG --protocol tcp --port 22 --cidr 0.0.0.0/0
+aws ec2 authorize-security-group-ingress --group-id $SG --protocol tcp --port 8080 --cidr 0.0.0.0/0
+
+# 3. AMI Ubuntu 22.04 mới nhất
+$AMI = (aws ec2 describe-images --owners 099720109477 --filters "Name=name,Values=ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-amd64-server-*" "Name=state,Values=available" --query 'reverse(sort_by(Images, &CreationDate))[0].ImageId' --output text).Trim()
+
+# 4. Launch instance
+aws ec2 run-instances --image-id $AMI --instance-type t3.micro --key-name income-key --security-group-ids $SG --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=income-api}]'
+
+# 5. Lấy Public IP (chờ ~30-60s cho instance running)
+aws ec2 describe-instances --filters "Name=tag:Name,Values=income-api" "Name=instance-state-name,Values=running" --query 'Reservations[0].Instances[0].PublicIpAddress' --output text
+```
+
+Lưu ý: chạy cả 5 bước trong **cùng một cửa sổ** PowerShell (biến `$SG`, `$AMI` là tạm). File `income-key.pem` nằm trong thư mục project và đã được `.gitignore` chặn (`*.pem`).
+
 ---
 
 ## 2.5 (AWS) Cấu Hình EC2 (Một Lần, Thủ Công)
 
+> **Windows/PowerShell:** `ssh` và `scp` có sẵn trong Windows OpenSSH nên dùng y như bash, chỉ cần đặt biến kiểu PowerShell: `$VM_IP = "<PUBLIC_IP>"` và tham chiếu `$VM_IP`. Riêng lệnh ở mục 2.8 dùng `$(cat ...)` (bash) — xem bản PowerShell ngay trong mục đó.
+
 SSH vào EC2 (user mặc định của Ubuntu AMI là `ubuntu`):
 
 ```bash
-export VM_IP=<PUBLIC_IP_VUA_LAY>
+export VM_IP=<PUBLIC_IP_VUA_LAY>       # PowerShell: $VM_IP = "<PUBLIC_IP>"
 ssh -i income-key.pem ubuntu@$VM_IP
 ```
 
@@ -329,9 +379,16 @@ ssh-keygen -t ed25519 -f ~/.ssh/income_deploy -N "" -C "github-actions-deploy"
 
 Thêm public key vào EC2:
 
+**Git Bash:**
 ```bash
 ssh -i income-key.pem ubuntu@$VM_IP \
   "echo '$(cat ~/.ssh/income_deploy.pub)' >> ~/.ssh/authorized_keys"
+```
+
+**PowerShell:**
+```powershell
+$PUB = Get-Content "$HOME\.ssh\income_deploy.pub"
+ssh -i income-key.pem ubuntu@$VM_IP "echo '$PUB' >> ~/.ssh/authorized_keys"
 ```
 
 ---
