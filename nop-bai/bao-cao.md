@@ -95,10 +95,10 @@ Cần nêu được:
 
 | | f1_score | accuracy |
 |---|---|---|
-| Bước 2 (chỉ `train_batch1`) | ___ | ___ |
-| Bước 3 (thêm `train_batch2`) | ___ | ___ |
+| Bước 2 (chỉ `train_batch1`) | 0.7149 | 0.874 |
+| Bước 3 (thêm `train_batch2`) | 0.7354 | 0.882 |
 
-**Nhận xét:** ___
+**Nhận xét:** Khi gấp đôi dữ liệu huấn luyện từ 22.361 lên 44.722 mẫu, f1_score tăng nhẹ 0,0205 (từ 0,7149 lên 0,7354) và accuracy tăng 0,008. Do hai batch được chia ngẫu nhiên từ cùng một nguồn nên có cùng phân phối, vì vậy mức cải thiện nhỏ là hợp lý: dữ liệu mới chủ yếu giúp giảm phương sai và ổn định mô hình chứ không mang thêm thông tin mới về mặt phân phối. Điều được kiểm chứng ở Bước 3 không phải là chỉ số cao hơn mà là quy trình tự động chạy đúng: một commit dữ liệu duy nhất đã kích hoạt toàn bộ pipeline huấn luyện lại, qua quality gate và triển khai mô hình mới mà không cần thao tác thủ công nào.
 
 <!--
 Một câu trả lời trung thực kiểu "f1 giảm 0,01 vì dữ liệu mới cùng phân phối, không mang
